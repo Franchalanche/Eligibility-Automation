@@ -1,4 +1,4 @@
-# Eligibility-SQL
+# Eligibility-Automation
 The purpose of this project is to combine data from tables with totally different structures & column names into one.  The field names were extracted and organized using sys schema (System Catalog Views) for metadata (see "ALL TABLES & COLUMNS[...].sql" file). A combination of regex & Visual Studio had to be used to determine the most appropriate date for a given raw file source.  The project continues to evolve as more requirements and unique client rules enter the picture.
 
 
