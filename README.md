@@ -1,17 +1,13 @@
 # Eligibility-SQL
+The purpose of this project is to combine data from tables with totally different structures & column names into one.  The field names were extracted and organized using sys schema (System Catalog Views) for metadata (see "ALL TABLES & COLUMNS[...].sql" file). A combination of regex & Visual Studio had to be used to determine the most appropriate date for a given raw file source.  The project continues to evolve as more requirements and unique client rules enter the picture.
 
-# File Guide
+
+## SQL File Order
 1) [ALL TABLES & COLUMNS IN A DATABASE v16 Eligibility Server PREMIER ONLY (Post GN Updates) w CreateDate].sql
-   creates [WorkBench].[dbo].[Eligibility_Table_Identifiers_RAW]
+   creates a table of table names and their corresponding column names
 
 2) [Eligibility Aggregate No Fetch - GN Edits w FP Edits].sql
-     creates Workbench.dbo.xxEligibility_All_RAW  - first extracted table
+     creates the first extracted table, using only values from the original sources
 
 3) [Stored Procedure - Eligibility_ALL_Raw_DB Initial Extract to Staging].sql
-     [dbo].[sp_Eligibility_Aggregation_RAW_Load_to_Staging] , initial extraction (initially xxEligibility_All_RAW, consider renaming to         Eligibility_ALL_Raw_DB_Extraction)
-
-4) [Stored Procedure - Eligibility_ALL_Raw_DB Staging to Final].sql
-   Create final table, proposed name "WorkBench.dbo.Eligibility_ALL_RAW_DB" using a merge on records not currently in the the final table
-
-5) [File_Name_Date_RegEx].sql
-   Regex logic for file name date extraction to be added to the creation of the staging table
+     transforms initialized table by adding calculated fields
