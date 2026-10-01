@@ -1,20 +1,20 @@
-USE [WorkBench]
-GO
-
---CREATE PROCEDURE [dbo].[[sp_Eligibility_Aggregation_RAW_Staging_to_Final]
-
---SET ANSI_NULLS ON
---GO
---SET QUOTED_IDENTIFIER ON
+--USE [WorkBench]
 --GO
 
-ALTER PROCEDURE [dbo].[sp_Eligibility_Aggregation_RAW_Load_to_Staging]
+----CREATE PROCEDURE [dbo].[[sp_Eligibility_Aggregation_RAW_Staging_to_Final]
 
---STAGING TABLE: [xxEligibility_All_RAW]: RENAME TO Eligibility_ALL_Raw_DB_Extraction
---Transformation: Eligibility_ALL_RAW_DB_STAGING
---Load/Finaltable: Eligibility_ALL_RAW_DB_FINAL
+----SET ANSI_NULLS ON
+----GO
+----SET QUOTED_IDENTIFIER ON
+----GO
 
-AS BEGIN
+--ALTER PROCEDURE [dbo].[sp_Eligibility_Aggregation_RAW_Load_to_Staging]
+
+----STAGING TABLE: [xxEligibility_All_RAW]: RENAME TO Eligibility_ALL_Raw_DB_Extraction
+----Transformation: Eligibility_ALL_RAW_DB_STAGING
+----Load/Finaltable: Eligibility_ALL_RAW_DB_FINAL
+
+--AS BEGIN
 
 DROP TABLE IF EXISTS #temp_staging;
 SELECT i.[Contract]
@@ -59,6 +59,7 @@ i
 
 ;
 --select count(*) as xxEligibility_All_RAW_Count from WorkBench.dbo.xxEligibility_All_RAW;
+select 'top 200 *' '#temp_staging';
 select top 200 * from #temp_staging;
 
 
@@ -173,7 +174,7 @@ select top 200 * from #temp_staging;
 	--NO INCREASES
 	select top 200 * from #temp_staging;
 
-
+SELECT 'File_Name_Date_Cleaned BEGAN' '#temp_staging Update';
 UPDATE #temp_staging
   SET  File_Name_Date_Cleaned = 
 	case 
@@ -345,6 +346,7 @@ UPDATE #temp_staging
 	and file_name_date_cleaned <> datefromparts(1900,1,1) 
 	and raw_file_timestamp = datefromparts(1900,1,1);
 
+SELECT 'File_Name_Date_Cleaned ENDED' '#temp_staging Update';
 
 
 --where RawFileDateTime = datefromparts(1900,1,1);
@@ -361,6 +363,7 @@ UPDATE #temp_staging
 
 --MAYBE RETHINK TO TAKE FILE NAME CLEANED DATE MORE SERIOUSLY?
 
+SELECT 'Chosen_Date BEGAN' '#temp_staging Update';
 	UPDATE #temp_staging
 	set Chosen_Date = 
 			case 
@@ -441,17 +444,21 @@ UPDATE #temp_staging
 				then CAST(File_Name_Date_Cleaned AS DATE)
 			else CAST(Chosen_Date AS DATE) end;
 
+SELECT 'Chosen_Date ENDED' '#temp_staging Update';
+
 --SELECT * FROM #temp_staging;
 --SELECT * FROM #temp_staging;
 
+SELECT 'Chosen_Date_Year_Month BEGAN' '#temp_staging Update';
 UPDATE #temp_staging
 set Chosen_Date_Year_Month = concat(year(Chosen_date),format(month(Chosen_Date),'00'))
 	--, Chosen_Date_Year = year(Chosen_Date)
 ;
+SELECT 'Chosen_Date_Year_Month ended' '#temp_staging Update';
 
 
 
-
+select 'DELETE ALREADY EXISTING RECORDS FROM PREUPLOAD' '#temp_staging BEGIN';
 DELETE t
 FROM #temp_staging t
 INNER JOIN WorkBench.dbo.Eligibility_ALL_RAW s
@@ -483,12 +490,45 @@ on s.[Contract] = t.[Contract]
 			and s.Chosen_date_Year_Month = t.Chosen_Date_Year_Month
 	--		and s.Month_Order = t.Month_Order
 ;
+select 'DELETE ALREADY EXISTING RECORDS FROM PREUPLOAD' '#temp_staging END';
 
+SELECT 'DROP INDEX BEGIN' '[Contract]';
 DROP INDEX [Contract] ON [dbo].[Eligibility_All_RAW]
+SELECT 'DROP INDEX BEGIN' '[File_Name]';
 DROP INDEX [File_Name] ON [dbo].[Eligibility_All_RAW]
+SELECT 'DROP INDEX BEGIN' '[File_Name_Date_Cleaned]';
 DROP INDEX [File_Name_Date_Cleaned] ON [dbo].[Eligibility_All_RAW]
+SELECT 'DROP INDEX BEGIN' '[Member_ID]';
 DROP INDEX [Member_ID] ON [dbo].[Eligibility_All_RAW]
 
+
+SELECT 'CREATE INDEX BEGIN' '[Contract]';
+CREATE NONCLUSTERED INDEX [Contract] ON [dbo].[Eligibility_All_RAW]
+(
+	[Contract] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+
+SELECT 'CREATE INDEX BEGIN' '[File_Name]';
+CREATE NONCLUSTERED INDEX [File_Name] ON [dbo].[Eligibility_All_RAW]
+(
+	[File_Name] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+
+SELECT 'CREATE INDEX BEGIN' '[File_Name_Date_CLEANED]';
+CREATE NONCLUSTERED INDEX [File_Name_Date_Cleaned] ON [dbo].[Eligibility_All_RAW]
+(
+	[File_Name_Date_CLEANED] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+
+SELECT 'CREATE INDEX BEGIN' '[Member_ID]';
+CREATE NONCLUSTERED INDEX [Member_ID] ON [dbo].[Eligibility_All_RAW]
+(
+	[Member_ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+
+
+
+SELECT 'INSERT INTO - BEGAN' 'Eligibility_ALL_RAW';
 INSERT INTO WorkBench.dbo.Eligibility_ALL_RAW 
 (  [Contract], Member_ID, Relationship_ID, New_Relationship, First_Name, Last_Name, Email	, Main_Phone, Street_Address
 		, Address_2, City, [State], Zip, Date_of_Birth, Coverage_Start_Date, Coverage_End_Date, Gender, Active_Indicator
@@ -504,32 +544,12 @@ SELECT [Contract], Member_ID, Relationship_ID, New_Relationship, First_Name, Las
 		
 FROM #temp_staging
 ;
-
-
-CREATE NONCLUSTERED INDEX [Contract] ON [dbo].[Eligibility_All_RAW]
-(
-	[Contract] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-
-CREATE NONCLUSTERED INDEX [File_Name] ON [dbo].[Eligibility_All_RAW]
-(
-	[File_Name] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-
-CREATE NONCLUSTERED INDEX [File_Name_Date_Cleaned] ON [dbo].[Eligibility_All_RAW]
-(
-	[File_Name_Date_CLEANED] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-
-CREATE NONCLUSTERED INDEX [Member_ID] ON [dbo].[Eligibility_All_RAW]
-(
-	[Member_ID] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-
+SELECT 'INSERT INTO - ENDED' 'Eligibility_ALL_RAW';
 
 
 drop TABLE IF EXISTS #Distinct_File_Names;
 
+SELECT 'CREATION BEGUN' '#Distinct_File_Names';
 WITH DISTINCT_ROWS AS
   (
 		SELECT --TOP (1000) 
@@ -557,9 +577,11 @@ WITH DISTINCT_ROWS AS
   INTO #Distinct_File_Names 
   from DISTINCT_ROWS 
 ;
+SELECT 'CREATION ENDED' '#Distinct_File_Names';
 
 
 DROP TABLE IF EXISTS #change_file_base;
+SELECT 'CREATION BEGUN' '#change_file_base';
 
 SELECT DISTINCT
 	 [File_Name]
@@ -579,8 +601,9 @@ into #change_file_base
  FROM WorkBench.dbo.Eligibility_ALL_RAW
  order by Contract, Chosen_Date
  ;
+ SELECT 'CREATION ENDED' '#change_file_base';
 
- 
+ SELECT 'RecordCt UPDATE BEGUN' '#change_file_base';
  update c
 	SET RecordCt = rfn.RecordCt
  FROM #change_file_base c
@@ -590,10 +613,12 @@ into #change_file_base
 		then rfn.RawFileNameOnly
 		else replace(replace(rfn.RawFileNameOnly,'.txt',''),'.csv','')
 		END ;
+ SELECT 'RecordCt UPDATE ENDED' '#change_file_base';
 
  select 'Record Count' '#change_file_base';
  select * from #change_file_base;
 
+ SELECT 'RecordCt Update' '#change_file_base';
   update c
 	SET RecordCt = rfn.RecordCt
  FROM #change_file_base c
@@ -604,6 +629,7 @@ into #change_file_base
 		else replace(replace(rfn.RawFileNameOnly,'.txt',''),'.csv','')
 		END ;
 
+ SELECT 'RecordCt Update round 2 begin' '#change_file_base';
 with new_count as
 (
 	select 
@@ -624,7 +650,10 @@ with new_count as
 	on c.Contract = nc.Contract 
 		and c.[File_Name] = nc.[File_Name]
 where c.RecordCt IS NULL;
+ SELECT 'RecordCt Update round 2 end' '#change_file_base';
 
+
+  SELECT 'Deviation_from_max_monthly Update begin' '#change_file_base';
 with MonthlyMax as
 (
 	SELECT 
@@ -652,16 +681,18 @@ LEFT JOIN MonthlyMax mm
 		and cb.Chosen_date_Year_Month = mm.Chosen_Date_Year_Month
 --		and cb.Month_Order = mm.Month_Order
 ;
+  SELECT 'Deviation_from_max_monthly Update end' '#change_file_base';
 
-
+  SELECT 'File_Type Update begin' '#change_file_base';
  UPDATE #change_file_base 
  SET File_Type = case when Deviation_from_Max_Monthly > -.10 then 'Full File'
 					  when Deviation_from_Max_Monthly < -.10 then 'Change File'
 					  else 'BLANK FILE'
 				end;
+  SELECT 'File_Type Update end' '#change_file_base';
 
 
-
+  SELECT 'Table_Type Update begin' '#change_file_base';
 UPDATE ear
 set ear.Table_Type = cfb.File_Type
 FROM WorkBench.dbo.Eligibility_ALL_RAW ear
@@ -669,6 +700,7 @@ JOIN #change_file_base cfb
 	on ear.Contract = cfb.Contract
 		and ear.[File_Name] = cfb.[File_Name]
 		and ear.Chosen_Date = cfb.Chosen_Date;
+  SELECT 'Table_Type Update end' '#change_file_base';
 
 
 SELECT TOP 1000 * FROM WorkBench.dbo.Eligibility_ALL_RAW
@@ -689,7 +721,7 @@ order by   Contract
 ;
 
 
-END
+--END
 
 	
 select distinct 
@@ -723,5 +755,4 @@ select distinct
 			when (datediff(day,Chosen_Date, IS_CreatedDate)>10 and IS_CreatedDate <> datefromparts(1900,1,1)) 
 				then 'IS Date Issue'
 			else '' end
-
-
+;
