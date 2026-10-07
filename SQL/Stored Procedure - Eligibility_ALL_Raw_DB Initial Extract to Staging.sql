@@ -16,6 +16,36 @@
 
 --AS BEGIN
 
+DROP TABLE IF EXISTS WorkBench.dbo.Eligibility_RawFileNames_v4_Combined;
+
+select * into WorkBench.dbo.Eligibility_RawFileNames_v4_Combined from
+(
+	select r.RawFileNameFull, r.RawFileDateTime, r.[FileSize (KB)]
+		, r.RecordCt, r.RawFileNameOnly
+		, LEFT(
+        RIGHT(r.RawFileNameFull, CHARINDEX('\', REVERSE(r.RawFileNameFull)) - 1),
+        CHARINDEX('.', RIGHT(r.RawFileNameFull, CHARINDEX('\', REVERSE(r.RawFileNameFull)) - 1)) - 1
+		 ) as Cleaned_Name
+		from WorkBench.dbo.Eligibility_RawFileNames r
+		left JOIN  WorkBench.dbo.Eligibility_RawFileNames og
+			on r.RawFileNameFull = og.RawFileNameFull
+	where og.RawFileNameFULL IS NULL
+
+	UNION ALL
+
+	SELECT V3.RawFileNameFull, v3.RawFileDateTime, v3.[FileSize (KB)]
+		, v3.RecordCt, v3.RawFileNameOnly
+		, LEFT(
+        RIGHT(v3.RawFileNameFull, CHARINDEX('\', REVERSE(v3.RawFileNameFull)) - 1),
+        CHARINDEX('.', RIGHT(v3.RawFileNameFull, CHARINDEX('\', REVERSE(v3.RawFileNameFull)) - 1)) - 1
+		 ) as Cleaned_Name
+		from WorkBench.dbo.Eligibility_RawFileNames_v3_Archive v3
+		left JOIN  WorkBench.dbo.Eligibility_RawFileNames og
+			on v3.RawFileNameFull = og.RawFileNameFull
+	where og.RawFileNameFULL IS NULL
+) a;
+
+select '' ' drop #temp_staging if exists ';
 DROP TABLE IF EXISTS #temp_staging;
 SELECT i.[Contract]
       , i.[Member_ID]
@@ -59,9 +89,9 @@ i
 
 ;
 --select count(*) as xxEligibility_All_RAW_Count from WorkBench.dbo.xxEligibility_All_RAW;
-select 'top 200 *' '#temp_staging';
-select top 200 * from #temp_staging;
-
+--select 'top 200 *' '#temp_staging';
+--select top 200 * from #temp_staging;
+--select 'end top 200 *' '#temp_staging';
 
 --ASSUMING SSIS CREATED TABLE IS NAMED Eligibility_Raw_File_Names
 
@@ -72,8 +102,11 @@ select top 200 * from #temp_staging;
 --JOIN WorkBench.dbo.Eligibility_RawFileNames rfn
 --ON stage.[Contract] = rfn.[Contract]
 
+;
 
+select 'initialization complete' '#temp_staging';
   ------ FILE NAME DATE - COMBINING ALL REGEX LOGIC FROM "File_Name_Date_RegEx.sql":
+select 'File_Name_Date Update BEGIN' 'File_Name_Date';
   UPDATE #temp_staging
   SET  File_Name_Date =
     CASE WHEN  [File_Name]  like '05712109%' and [File_Name]  like '%[_][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][_]%' 
@@ -170,9 +203,11 @@ select top 200 * from #temp_staging;
        then substring([File_Name], patindex('%Dec_[0-9][0-9][0-9][0-9]%', [File_Name]),8)
     else '0' end;
 
-	select count(*) as xxEligibility_All_RAW_Count from WorkBench.dbo.xxEligibility_All_RAW;
-	--NO INCREASES
-	select top 200 * from #temp_staging;
+select 'File_Name_Date Update END' 'File_Name_Date';
+
+	--select count(*) as xxEligibility_All_RAW_Count from WorkBench.dbo.xxEligibility_All_RAW;
+	----NO INCREASES
+	--select top 200 * from #temp_staging;
 
 SELECT 'File_Name_Date_Cleaned BEGAN' '#temp_staging Update';
 UPDATE #temp_staging
