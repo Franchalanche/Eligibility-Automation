@@ -15,9 +15,8 @@
 ----Load/Finaltable: Eligibility_ALL_RAW_DB_FINAL
 
 --AS BEGIN
-
 DROP TABLE IF EXISTS WorkBench.dbo.Eligibility_RawFileNames_v4_Combined;
-select 'Begin Creation' 'Eligibility_RawFileNames_v4_Combined';
+
 select * into WorkBench.dbo.Eligibility_RawFileNames_v4_Combined from
 (
 	select r.RawFileNameFull, r.RawFileDateTime, r.[FileSize (KB)]
@@ -26,10 +25,11 @@ select * into WorkBench.dbo.Eligibility_RawFileNames_v4_Combined from
         RIGHT(r.RawFileNameFull, CHARINDEX('\', REVERSE(r.RawFileNameFull)) - 1),
         CHARINDEX('.', RIGHT(r.RawFileNameFull, CHARINDEX('\', REVERSE(r.RawFileNameFull)) - 1)) - 1
 		 ) as Cleaned_Name
+		 , 'OG Table' as [Source]
 		from WorkBench.dbo.Eligibility_RawFileNames r
-		left JOIN  WorkBench.dbo.Eligibility_RawFileNames og
-			on r.RawFileNameFull = og.RawFileNameFull
-	where og.RawFileNameFULL IS NULL
+		left JOIN  WorkBench.dbo.Eligibility_RawFileNames_v3_Archive v3
+			on r.RawFileNameFull = v3.RawFileNameFull
+	where v3.RawFileNameFULL IS NULL
 
 	UNION ALL
 
@@ -39,13 +39,39 @@ select * into WorkBench.dbo.Eligibility_RawFileNames_v4_Combined from
         RIGHT(v3.RawFileNameFull, CHARINDEX('\', REVERSE(v3.RawFileNameFull)) - 1),
         CHARINDEX('.', RIGHT(v3.RawFileNameFull, CHARINDEX('\', REVERSE(v3.RawFileNameFull)) - 1)) - 1
 		 ) as Cleaned_Name
+		, 'V_3 Table' as [Source]
 		from WorkBench.dbo.Eligibility_RawFileNames_v3_Archive v3
-		left JOIN  WorkBench.dbo.Eligibility_RawFileNames og
-			on v3.RawFileNameFull = og.RawFileNameFull
-	where og.RawFileNameFULL IS NULL
 ) a;
 
 select 'END Creation' 'Eligibility_RawFileNames_v4_Combined';
+
+select 'REMOVE DUPLICATES - BEGIN' 'Eligibility_RawFileNames_v4_Combined';
+with cte as
+(
+	select RawFileNameFUll
+		 , RawFileDateTime
+		 , [FileSize (KB)]
+		 , RecordCt
+		 , RawFileNameOnly
+		 , Cleaned_Name
+		 , [Source]
+		 , row_number() over (PARTITION BY RawFileNameFUll
+								 , RawFileDateTime
+								 , [FileSize (KB)]
+								 , RecordCt
+								 , RawFileNameOnly
+								 , Cleaned_Name
+							ORDER BY RawFileNameFUll
+								 , RawFileDateTime
+								 , [FileSize (KB)]
+								 , RecordCt
+								 , RawFileNameOnly
+								 , Cleaned_Name) 
+				AS row_num
+			FROM WorkBench.dbo.Eligibility_RawFileNames_v4_Combined
+)
+delete from cte where row_num > 1;
+select 'REMOVE DUPLICATES - END' 'Eligibility_RawFileNames_v4_Combined';
 
 select 'Begin Creation' '#temp_staging ';
 DROP TABLE IF EXISTS #temp_staging;
@@ -86,6 +112,13 @@ SELECT i.[Contract]
 INTO #temp_staging
 FROM WorkBench.dbo.xxEligibility_All_RAW--Eligibility_ALL_Raw_DB_Extraction 
 i
+--UPDATED WHERE CLAUSE - only add new files loaded	
+WHERE coalesce(file_name,'') NOT IN 
+		(
+			select distinct coalesce(file_name,'')
+			from workbench.dbo.Eligibility_All_RAW
+		)
+;	
 
 select 'initialization complete' '#temp_staging'
 ;
@@ -363,7 +396,10 @@ UPDATE #temp_staging
 	from 	#temp_staging s
 	JOIN WorkBench.dbo.Eligibility_RawFileNames_v4_Combined RFN_v4 
 		on s.[File_Name] =  RFN_v4.Cleaned_Name 
-	where s.[File_Name] NOT like '%.csv' or s.[File_Name] NOT like '%.txt'
+	where s.[File_Name] NOT like '%.csv' AND 
+		--or 
+		--UPDATED FROM OR TO AND FOR EFFICIENCY - BOTH NEGATIVES
+			s.[File_Name] NOT like '%.txt'
 		;
 
 	update s
