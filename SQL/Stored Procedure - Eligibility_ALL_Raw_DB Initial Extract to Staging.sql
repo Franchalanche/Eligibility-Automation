@@ -17,7 +17,7 @@
 --AS BEGIN
 
 DROP TABLE IF EXISTS WorkBench.dbo.Eligibility_RawFileNames_v4_Combined;
-
+select 'Begin Creation' 'Eligibility_RawFileNames_v4_Combined';
 select * into WorkBench.dbo.Eligibility_RawFileNames_v4_Combined from
 (
 	select r.RawFileNameFull, r.RawFileDateTime, r.[FileSize (KB)]
@@ -45,7 +45,9 @@ select * into WorkBench.dbo.Eligibility_RawFileNames_v4_Combined from
 	where og.RawFileNameFULL IS NULL
 ) a;
 
-select '' ' drop #temp_staging if exists ';
+select 'END Creation' 'Eligibility_RawFileNames_v4_Combined';
+
+select 'Begin Creation' '#temp_staging ';
 DROP TABLE IF EXISTS #temp_staging;
 SELECT i.[Contract]
       , i.[Member_ID]
@@ -84,10 +86,10 @@ SELECT i.[Contract]
 INTO #temp_staging
 FROM WorkBench.dbo.xxEligibility_All_RAW--Eligibility_ALL_Raw_DB_Extraction 
 i
---where 
---i.[Contract] like '%latham%'
 
+select 'initialization complete' '#temp_staging'
 ;
+
 --select count(*) as xxEligibility_All_RAW_Count from WorkBench.dbo.xxEligibility_All_RAW;
 --select 'top 200 *' '#temp_staging';
 --select top 200 * from #temp_staging;
@@ -104,7 +106,6 @@ i
 
 ;
 
-select 'initialization complete' '#temp_staging';
   ------ FILE NAME DATE - COMBINING ALL REGEX LOGIC FROM "File_Name_Date_RegEx.sql":
 select 'File_Name_Date Update BEGIN' 'File_Name_Date';
   UPDATE #temp_staging
