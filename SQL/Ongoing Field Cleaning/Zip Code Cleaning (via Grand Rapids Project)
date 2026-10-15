@@ -1,0 +1,485 @@
+drop table if exists #premier_zips_2
+;
+select distinct
+	e.Zip as Premier_Zip
+	, e.State
+	, e.City
+	,  case 
+		when len(trim(e.Zip))< 5 
+			then concat(replicate('0',5-len(trim(e.Zip))),trim(e.Zip))
+		when len(trim(e.Zip))> 5 and e.Zip like '%-%' and len(left(trim(e.Zip),charindex('-',trim(e.Zip))))=5 
+			then left(trim(e.Zip),5)
+		when len(trim(e.Zip))> 5 and e.Zip like '%e+%' 
+			then left(replace(trim(e.Zip),'.',''), 5) 
+		when len(trim(e.Zip))> 5 
+			then left(trim(e.Zip),5) 
+		else trim(e.Zip) 
+			end as Fixed_Zip
+	, cast(0 as float) as Latitude
+	, cast(0 as float) as Longitude
+into #premier_zips_2
+from WOrkBench.dbo.ELIGIBILITY_ALL_RAW e
+;
+
+select 'ALL' '#premier_zips_2';
+select * from #premier_zips_2;
+
+
+update pz2
+SET latitude = z.Latitude
+, Longitude = z.Longitude
+FROM #premier_zips_2 pz2 
+LEFT JOIN WorkBench.dbo.vw_Dim_ZipCodes z
+	on case when pz2.Fixed_Zip not like '%[A-Za-z]%' 
+				and pz2.Fixed_Zip not like '%-%' 
+				and pz2.Fixed_Zip not like '%.%'
+				and pz2.Fixed_Zip not like '%/%'
+		then cast(cast(pz2.Fixed_Zip as int) as varchar(20))
+			else pz2.Fixed_Zip end = z.Zip
+where pz2.Latitude = 0 and pz2.Longitude = 0
+;
+
+select 'AFTER LAT & LONG UPDATE' '#premier_zips_2';
+select * from #premier_zips_2;
+
+DROP TABLE IF EXISTS #premier_zips_2_FIXED;
+SELECT * 
+INTO #premier_zips_2_FIXED
+FROM #premier_zips_2 
+WHERE longitude IS NOT NULL and latitude is not null
+;
+
+
+
+select '' '#premier_zips_2_FIXED';
+select * from #premier_zips_2_FIXED;
+
+
+drop table if exists #grand_rapids;
+select distinct Zip
+, City
+, StateAbbreviated
+, Longitude
+, Latitude
+into #grand_rapids
+from WorkBench.dbo.vw_Dim_ZipCodes
+where city like '%Grand Rapids%'
+	and StateAbbreviated = 'MI'
+;
+
+
+select '' '#grand_rapids';
+select * from #grand_rapids;
+
+drop table if exists #new_basis;
+select distinct pz.Fixed_Zip as Premier_Zip
+, pz.Latitude as Premier_Latitude
+, pz.Longitude as Premier_Longitude
+, gr.Zip as GrandRapids_Zip
+, gr.Longitude as GrandRapids_Longitude
+, cast(0 as float) as Distance
+, gr.Latitude as GrandRapids_Latitude
+, gr.City
+, gr.StateAbbreviated
+into #new_basis
+FROM #premier_zips_2_fixed pz
+cross apply #grand_rapids gr
+;
+
+select '' '#new_basis';
+select top 100000 * from #new_basis
+order by Premier_Zip, GrandRapids_Zip;
+
+
+drop table if exists #better_basis;
+select distinct
+	Premier_Zip
+	, Premier_Latitude
+	, Premier_Longitude
+	, GrandRapids_Zip
+	, GrandRapids_Longitude
+	, GrandRapids_Latitude
+	, Distance
+	, City
+	, StateAbbreviated
+into #better_basis
+FROM #new_basis
+order by Premier_Zip
+;
+
+
+select '' '#better_basis';
+select * from #better_basis
+order by Premier_Zip, GrandRapids_Zip;
+
+update #better_basis 
+set Distance = geography::Point(Premier_Latitude, Premier_Longitude, 4326).STDistance(geography::Point(GrandRapids_Latitude, GrandRapids_Longitude, 4326))/1609.34
+;
+
+select 'POST GEOGRAPHY DISTANCE UPDATE' '#better_basis';
+select * from #better_basis
+where Distance <=50
+order by Premier_Zip, Distance;
+
+drop table if exists #better_basis_2;
+
+with min_distance as 
+(
+	select 
+	  Premier_Zip
+	, min(Distance) 
+		as Closest_to_Grand_Rapids
+	FROM #better_basis
+	group by Premier_Zip
+	)
+select md.*
+, zip.City
+, zip.State
+, Premier_Latitude
+, Premier_Longitude
+, GrandRapids_Zip
+, GrandRapids_Longitude
+, GrandRapids_Latitude
+, cast(0 as varchar(20)) as Range_Name
+into #better_basis_2
+from min_distance md 
+left join #better_basis bb
+	on md.Premier_Zip = bb.Premier_Zip
+		and md.Closest_to_Grand_Rapids = bb.Distance
+left join WOrkbench.dbo.vw_Dim_ZipCodes zip
+	on md.Premier_Zip = zip.Zip
+;
+
+select '' '#better_basis_2';
+select * from #better_basis_2
+--;
+
+UPDATE #better_basis_2
+set Range_Name =
+	case when --Closest_to_Grand_Rapids > 0 and 
+				Closest_to_Grand_Rapids <= 10 
+			then '00 - 10'
+		when Closest_to_Grand_Rapids > 10 and Closest_to_Grand_Rapids <= 20 then '10 - 20'
+		when Closest_to_Grand_Rapids > 20 and Closest_to_Grand_Rapids <= 30 then '20 - 30'
+		when Closest_to_Grand_Rapids > 30 and Closest_to_Grand_Rapids <= 40 then '30 - 40'
+		when Closest_to_Grand_Rapids > 40 and Closest_to_Grand_Rapids <= 50 then '40 - 50'
+		when Closest_to_Grand_Rapids > 50 and Closest_to_Grand_Rapids <= 60 then '50 - 60'
+		when Closest_to_Grand_Rapids > 60 and Closest_to_Grand_Rapids <= 70 then '60 - 70'
+		when Closest_to_Grand_Rapids > 70 and Closest_to_Grand_Rapids <= 80 then '70 - 80'
+		when Closest_to_Grand_Rapids > 70 and Closest_to_Grand_Rapids <= 80 then '80 - 90'
+	else '90+' END
+;
+
+
+select 'Post Range Name Update' '#better_basis_2';
+select * 
+from #better_basis_2
+order by Closest_to_Grand_Rapids
+;
+
+drop table if exists #updated_elig_basis;
+
+select --distinct 
+	contract
+	, Zip
+	, count(distinct(concat(Member_ID,New_Relationship,First_Name,Date_of_Birth))) as Unique_Members
+	, case 
+		when len(trim(e.Zip))< 5 
+			then concat(replicate('0',5-len(trim(e.Zip))),trim(e.Zip))
+		when len(trim(e.Zip))> 5 and e.Zip like '%-%' and len(left(trim(e.Zip),charindex('-',trim(e.Zip))))=5 
+			then left(trim(e.Zip),5)
+		when len(trim(e.Zip))> 5 and e.Zip like '%e+%' 
+			then left(replace(trim(e.Zip),'.',''), 5) 
+		when len(trim(e.Zip))> 5 
+			then left(trim(e.Zip),5) 
+		else trim(e.Zip) 
+			end as Fixed_Zip
+into #updated_elig_basis
+FROM WOrkBench.dbo.ELIGIBILITY_ALL_RAW e
+group by contract
+	, Zip
+;
+
+select '' '#updated_elig_basis';
+select * from #updated_elig_basis
+order by Zip, Fixed_Zip;
+
+drop table if exists #updated_elig_basis_2;
+select contract, fixed_zip, sum(Unique_Members) as Unique_Members
+into #updated_elig_basis_2 
+FROM #updated_elig_basis 
+group by contract, fixed_zip
+;
+
+select '' '#updated_elig_basis_2';
+select *
+from #updated_elig_basis_2
+order by fixed_zip, contract;
+
+
+SELECT '00-10 MILE RANGE CONTRATS+MEMB' '#updated_elig_basis_2';
+select distinct
+	e.Contract
+	, sum(e.Unique_Members) as Unique_Members
+--INTO #ZERO_TO_TEN
+FROM  #updated_elig_basis_2 e
+left join #better_basis_2 b
+	on e.Fixed_Zip = b.Premier_Zip
+where Range_Name in 
+	(
+		'00 - 10'
+		--, '10 - 20'
+		--, '20 - 30'
+		--, '30 - 40'
+		--, '40 - 50'
+		--, '50 - 60'
+	)
+	group by e.contract
+;
+
+SELECT '00-10 UNIQUE CONTRATS+MEMB COUNTS' '#updated_elig_basis_2';
+select distinct
+	--e.Contract	, 
+	sum(e.Unique_Members) as Unique_Members
+	, count(distinct Contract) as Unique_Contracts
+
+FROM  #updated_elig_basis_2 e
+left join #better_basis_2 b
+	on e.Fixed_Zip = b.Premier_Zip
+where Range_Name in 
+	(
+		'00 - 10'
+		--, '10 - 20'
+		--, '20 - 30'
+		--, '30 - 40'
+		--, '40 - 50'
+		--, '50 - 60'
+	)
+;
+
+/*ROLLUPS WERE DONE MANUALLY*/
+--select --top 100 
+--* 
+--from DLDB.dbo.DL_DW_LuFaxContract
+--;
+
+--SELECT '00-10 MILE RANGE CONTRATS+MEMB' '#updated_elig_basis_2 W LUFAXCONTRACT';
+--select distinct
+--	e.Contract
+--	, sum(e.Unique_Members) as Unique_Members
+--	, luf.ContractDesc
+--	, luf.Active
+--	, luf.contract_term_dt
+--	, luf.termed_out
+----INTO #ZERO_TO_TEN
+--FROM  #updated_elig_basis_2 e
+--left join #better_basis_2 b
+--	on e.Fixed_Zip = b.Premier_Zip
+--left join DLDB.dbo.DL_DW_LuFaxContract luf
+--	on left(e.Contract,5) like concat('%',left(luf.ContractDesc,5),'%')
+--where Range_Name in 
+--	(
+--		'00 - 10'
+--		--, '10 - 20'
+--		--, '20 - 30'
+--		--, '30 - 40'
+--		--, '40 - 50'
+--		--, '50 - 60'
+--	)
+--	and luf.Active = 1
+--	group by e.contract , luf.ContractDesc
+--	, luf.Active
+--	, luf.contract_term_dt
+--	, luf.termed_out
+--;
+
+
+--SELECT '00-10 MILE RANGE CONTRATS+MEMB W rollup' '#updated_elig_basis_2 W LUFAXCONTRACT';
+--drop table if exists #rollup_summary;
+--select distinct
+--	e.Contract
+--	, sum(e.Unique_Members) as Unique_Members
+--	, luf.ContractDesc
+--	, cr.RollupName
+--	, luf.Active
+--	, luf.contract_term_dt
+--	, luf.termed_out
+----INTO #ZERO_TO_TEN
+--into #rollup_summary
+--FROM  #updated_elig_basis_2 e
+--left join #better_basis_2 b
+--	on e.Fixed_Zip = b.Premier_Zip
+--left join DLDB.dbo.DL_DW_LuFaxContract luf
+--	on left(e.Contract,5) like concat('%',left(luf.ContractDesc,5),'%')
+--LEFT JOIN WorkBench.dbo.[ContractName_RollUpName_CrossReference] cr
+--	on luf.ContractDesc = cr.Contract
+--where Range_Name in 
+--	(
+--		'00 - 10'
+--		--, '10 - 20'
+--		--, '20 - 30'
+--		--, '30 - 40'
+--		--, '40 - 50'
+--		--, '50 - 60'
+--	)
+--	and luf.Active = 1
+--	group by e.contract , luf.ContractDesc
+--	, luf.Active
+--	, luf.contract_term_dt
+--	, luf.termed_out
+--	, cr.RollupName
+--;
+
+--select '' '#rollup_summary';
+--select * from #rollup_summary;
+
+--select 'distinct contract name' '#rollup_summary';
+--select distinct RollupName 
+--, sum(Unique_Members) as Unique_Members
+--from #rollup_summary 
+--group by RollupName
+--order by RollupName;
+
+
+
+--SELECT '00-10 MILE RANGE CONTRATS+MEMB W rollup' '#updated_elig_basis_2 W LUFAXCONTRACT';
+--drop table if exists #rollup_summary_2;
+--select distinct
+--	e.Contract
+--	, sum(e.Unique_Members) as Unique_Members
+--	, luf.ContractDesc
+--	, cr.RollupName
+--	, luf.Active
+--	, luf.contract_term_dt
+--	, luf.termed_out
+----INTO #ZERO_TO_TEN
+--into #rollup_summary_2
+--FROM  #updated_elig_basis_2 e
+--left join #better_basis_2 b
+--	on e.Fixed_Zip = b.Premier_Zip
+--left join DLDB.dbo.DL_DW_LuFaxContract luf
+--	on left(e.Contract,20) like concat('%',left(luf.ContractDesc,20),'%')
+--LEFT JOIN WorkBench.dbo.[ContractName_RollUpName_CrossReference] cr
+--	on luf.ContractDesc = cr.Contract
+--where Range_Name in 
+--	(
+--		'00 - 10'
+--		--, '10 - 20'
+--		--, '20 - 30'
+--		--, '30 - 40'
+--		--, '40 - 50'
+--		--, '50 - 60'
+--	)
+--	and luf.Active = 1
+--	group by e.contract , luf.ContractDesc
+--	, luf.Active
+--	, luf.contract_term_dt
+--	, luf.termed_out
+--	, cr.RollupName
+--;
+
+
+--select '' '#rollup_summary_2';
+--select * from #rollup_summary_2;
+
+--select 'distinct contract name' '#rollup_summary_2';
+--select distinct RollupName 
+--, sum(Unique_Members) as Unique_Members
+--from #rollup_summary_2 
+--group by RollupName
+--order by RollupName;
+
+
+
+
+--SELECT '00-10 MILE RANGE CONTRATS+MEMB W rollup' '#updated_elig_basis_2 W LUFAXCONTRACT';
+--drop table if exists #rollup_summary_3;
+--select distinct
+--	e.Contract
+--	, sum(e.Unique_Members) as Unique_Members
+--	, luf.ContractDesc
+--	, cr.RollupName
+--	, luf.Active
+--	, luf.contract_term_dt
+--	, luf.termed_out
+----INTO #ZERO_TO_TEN
+--into #rollup_summary_3
+--FROM  #updated_elig_basis_2 e
+--left join #better_basis_2 b
+--	on e.Fixed_Zip = b.Premier_Zip
+--left join DLDB.dbo.DL_DW_LuFaxContract luf
+--	on left(e.Contract,10) like concat('%',left(luf.ContractDesc,10),'%')
+--LEFT JOIN WorkBench.dbo.[ContractName_RollUpName_CrossReference] cr
+--	on luf.ContractDesc = cr.Contract
+--where Range_Name in 
+--	(
+--		'00 - 10'
+--		--, '10 - 20'
+--		--, '20 - 30'
+--		--, '30 - 40'
+--		--, '40 - 50'
+--		--, '50 - 60'
+--	)
+--	and luf.Active = 1
+--	group by e.contract , luf.ContractDesc
+--	, luf.Active
+--	, luf.contract_term_dt
+--	, luf.termed_out
+--	, cr.RollupName
+--;
+
+
+--select '' '#rollup_summary_3';
+--select * from #rollup_summary_3;
+
+--select 'distinct contract name' '#rollup_summary_3';
+--select distinct RollupName 
+--, sum(Unique_Members) as Unique_Members
+--from #rollup_summary_3 
+--group by RollupName
+--order by RollupName;
+
+
+
+SELECT 'ROUGH PULLING - NOT ALL BC ID HAVE TO CLEAN ALL ZIPS or latest records' 'all members';
+drop table if exists #rough_member_pull;
+select e.* 
+into #rough_member_pull
+from WorkBench.dbo.Eligibility_all_raw e
+join #better_basis_2 bb2
+	on e.zip = bb2.premier_zip
+		and bb2.Range_Name = '00 - 10'
+;
+select '' '#rough_member_pull';
+select * from #rough_member_pull;
+
+select count(distinct Contract) as unique_contract_double_check
+, count(distinct concat(member_ID,new_relationship,first_name,date_of_birth)) as Unique_member_double_check
+from #rough_member_pull
+;
+
+drop table if exists #baseline_fixed_zip;
+with baseline_fixed_zip as 
+(
+	select distinct 
+		member_id
+		, new_relationship
+		, contract
+		, first_name
+		, date_of_birth
+		, zip
+		,  case 
+		when len(trim(e.Zip))< 5 
+			then concat(replicate('0',5-len(trim(e.Zip))),trim(e.Zip))
+		when len(trim(e.Zip))> 5 and e.Zip like '%-%' and len(left(trim(e.Zip),charindex('-',trim(e.Zip))))=5 
+			then left(trim(e.Zip),5)
+		when len(trim(e.Zip))> 5 and e.Zip like '%e+%' 
+			then left(replace(trim(e.Zip),'.',''), 5) 
+		when len(trim(e.Zip))> 5 
+			then left(trim(e.Zip),5) 
+		else trim(e.Zip) 
+			end as Fixed_Zip
+	FROM WorkBench.dbo.Eligibility_all_raw
+
+
+)
