@@ -652,6 +652,40 @@ WITH DISTINCT_ROWS AS
 SELECT 'CREATION ENDED' '#Distinct_File_Names';
 
 
+
+;WITH MaxOrders AS
+(
+    SELECT
+        Contract,
+        Chosen_Date_Year_Month,
+        MAX(Month_Order) AS Max_Month_Order
+    FROM #Distinct_File_Names
+    GROUP BY
+        Contract,
+        Chosen_Date_Year_Month
+)
+UPDATE ts
+SET
+    ts.Month_Order = d.Month_Order,
+    ts.order_Desc =
+        CASE
+            WHEN d.Month_Order = 1 AND d.Month_Order = m.Max_Month_Order
+                THEN 'First and Last'
+            WHEN d.Month_Order = 1
+                THEN 'First'
+            WHEN d.Month_Order = m.Max_Month_Order
+                THEN 'Last'
+            ELSE ''
+        END
+FROM WorkBench.dbo.Eligibility_ALL_RAW ts
+JOIN #Distinct_File_Names d
+    ON ts.[File_Name] = d.[File_Name]
+    AND ts.[Contract] = d.[Contract]
+JOIN MaxOrders m
+    ON m.Contract = d.Contract
+    AND m.Chosen_Date_Year_Month = d.Chosen_Date_Year_Month;
+
+
 DROP TABLE IF EXISTS #change_file_base;
 SELECT 'CREATION BEGUN' '#change_file_base';
 
