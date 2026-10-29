@@ -81,13 +81,13 @@ FROM #column_data c
 GROUP BY c.[Server], c.[schema_name] , c.table_name
 ORDER BY c.[Server], c.[schema_name] , c.table_name;
 
- 
+ select '' '#schema_summary';
  select * from #schema_summary
  ----select * from  [WorkBench].[dbo].[xxEligibility_All_RAW]
  --select count(distinct table_name) as schema_summary_tables from #schema_summary
  -- select count(distinct Source_table) as xxElig_Raw_Tables from [WorkBench].[dbo].[xxEligibility_All_RAW]
 
-
+select 'w bracketed table name' '#schema_summary';
  select ',''['+s.table_name+']''',s.*
  from #schema_summary s
  left join (select distinct Source_Table from [WorkBench].[dbo].[xxEligibility_All_RAW]) xe
@@ -95,20 +95,20 @@ ORDER BY c.[Server], c.[schema_name] , c.table_name;
  where xe.Source_Table IS NULL
 
 
- DECLARE @sql_QC nvarchar(max)='';
+-- DECLARE @sql_QC nvarchar(max)='';
 
-SELECT @sql_QC += '
-SELECT * 
-FROM [PRODELGBLTY1].[PREMIER_Eligibility_Staging].dbo.['+table_name+'];'
-FROM #schema_summary s
-LEFT JOIN (
-    SELECT DISTINCT Source_Table
-    FROM [WorkBench].[dbo].[xxEligibility_All_RAW]
-) xe
-ON '[PRODELGBLTY1].[PREMIER_Eligibility_Staging].dbo.['+s.table_name+']' = xe.Source_Table
-WHERE xe.Source_Table IS NULL;
+--SELECT @sql_QC += '
+--SELECT * 
+--FROM [PRODELGBLTY1].[PREMIER_Eligibility_Staging].dbo.['+table_name+'];'
+--FROM #schema_summary s
+--LEFT JOIN (
+--    SELECT DISTINCT Source_Table
+--    FROM [WorkBench].[dbo].[xxEligibility_All_RAW]
+--) xe
+--ON '[PRODELGBLTY1].[PREMIER_Eligibility_Staging].dbo.['+s.table_name+']' = xe.Source_Table
+--WHERE xe.Source_Table IS NULL;
 
-EXEC sp_executesql @sql_QC;
+--EXEC sp_executesql @sql_QC;
 
 drop table if exists #Table_with_ID_Info;
 
@@ -120,8 +120,15 @@ SELECT
 		 when columns_csv like '%MEMBER ID (Assigned In Data Warehouse)%' then 'MEMBER ID (Assigned In Data Warehouse)' 
 		 when columns_csv like '%MEMBER ID%' then 'MEMBER ID' 
 		 when columns_csv like '%Alternate_ID%' then 'Alternate_ID' 
-		 when columns_csv like '%group_reporting_MEMBER_ID%' then 'group_reporting_MEMBER_ID'
-		 when columns_csv like '%MEMBER[_]ID%' then 'MEMBER_ID'
+		 --when columns_csv like '%group_reporting_MEMBER_ID%' then 'group_reporting_MEMBER_ID' --WRONG!! BRADLEY NEEDS SUBSCRIBER_ID
+		 when columns_csv like '%MEMBER[_]ID%' 
+				AND TABLE_NAME NOT LIKE '%ARKEMA%'
+				AND TABLE_NAME NOT LIKE '%CRICUT%'
+				AND TABLE_NAME NOT LIKE '%LURIE%'
+				AND TABLE_NAME NOT LIKE '%PLUG%'
+				AND TABLE_NAME NOT LIKE '%WEWORK%'
+				AND TABLE_NAME NOT LIKE '%BRADLEY%' --uses subscriberID
+			then 'MEMBER_ID'
 		 when columns_csv like '%EmployeeID%' then 'EmployeeID' 
  		 when columns_csv like '%ContractID%' then 'ContractID'  --For Bloomberg (Employers)
 		 when columns_csv like '%UNIQUE_ID%' then 'UNIQUE_ID' --Baker Donelson BCBS & UMR (Premier)
@@ -135,13 +142,20 @@ SELECT
 		 when columns_csv like '%Insured[_]ID%' then 'Insured_ID' --Isuzu
 		 when columns_csv like '%PID#%' then 'PID#' --Loeb & Loeb
 		 when columns_csv like '%CurSubNum%' then 'CurSubNum' --U Cali
-		 when columns_csv like '%Member[_]Number%' then 'Member_Number' --Orion (empty table)
+		 when columns_csv like '%Member[_]Number%' 
+				AND TABLE_NAME NOT LIKE '%BRADLEY%'
+			then 'Member_Number' --Orion (empty table)
 		 when columns_csv like '%SLNO%' then 'SLNO' --TBL_FIDELITY_DISNEY
+		 when columns_csv like '%SubscriberID%' then 'SubscriberID' --Global Health
+		 when columns_csv like '%Subscriber_ID%' then 'Subscriber_ID' --Bradley
+		 when columns_csv like '%HCID%' then 'HCID' --University of Colorado
+		 when columns_csv like '%MemberNumber%' then 'MemberNumber' --Warner Music
 		ELSE 'NULL' END as [Member Identifier]
 	, case 
 		 when columns_csv like '%Individual[_]Relationship[_]Code%' then 'Individual_Relationship_Code' -- disney fidelity
 		 when columns_csv like '%MBR[_]NBR[_]Actual%' then 'MBR_NBR_Actual' -- enbridge
-		 when columns_csv like '%MemberNumber%' then 'MemberNumber' 
+		 --when columns_csv like '%MemberNumber%' then 'MemberNumber' --Warner's Member_ID, not relatoionship_ID
+		 when columns_csv like '%RecordIdentifier%' then 'RecordIdentifier' --Warner Music
 		 when columns_csv like '%MBR[_]NBR%' then 'MBR_NBR' 
 		 when columns_csv like '%MEMB[_]NBR%' then 'MEMB_NBR' 
 		 when columns_csv like '%Member Relationship To Subscriber%' then 'Member Relationship To Subscriber' 
@@ -155,6 +169,7 @@ SELECT
 		 when columns_csv like '%ELATIONSHIP[_]TO[_]EMP%' then 'ELATIONSHIP_TO_EMP' --Chewy
 		 when columns_csv like '%RELATION%' then 'RELATION' --NEW Mountain
 		 when columns_csv like '%MBRID%' then 'MBRID' --U Cali
+		 when columns_csv like '%MBR_REL_CD%' then 'MBR_REL_CD' --U COLORADO
 		ELSE 'NULL' END as [Relationship Identifier]	
 	, case 
 		 when columns_csv like '%DEPENDENT[_]FIRST[_]NAME%' AND table_name = 'Tbl_Fidelity_Disney_Dependent_Raw' then 'DEPENDENT_FIRST_NAME'
@@ -172,7 +187,8 @@ SELECT
 		 when columns_csv like '%FNAME%' then 'FNAME' 
 		 when columns_csv like '%FIRST AND MIDDLE%' then 'FIRST AND MIDDLE' --iHeart Meritain
 		 when columns_csv like '%FIRST[_]AND[_]MIDDLE%' then 'FIRST_AND_MIDDLE' --isuzu
-		ELSE 'NULL' END as [First Name Identifier]
+		 when columns_csv like '%MBR_FIRST_NM%' then 'MBR_FIRST_NM' --U COLORADO
+	ELSE 'NULL' END as [First Name Identifier]
 	, case 
 		 when columns_csv like '%DEPENDENT[_]LAST[_]NAME%' AND table_name = 'Tbl_Fidelity_Disney_Dependent_Raw' then 'DEPENDENT_LAST_NAME'
 		 when columns_csv like '%MEMBER LAST NAME%' then 'MEMBER LAST NAME' 
@@ -187,6 +203,7 @@ SELECT
 		 when columns_csv like '%LastName%' then 'LastName' 
 		 when columns_csv like '%subLNAME%' then 'SUBLNAME' --U CALI
 		 when columns_csv like '%LNAME%' then 'LNAME' 
+		 when columns_csv like '%MBR_LAST_NM%' then 'MBR_LAST_NM' --U COLORADO
 		ELSE 'NULL' END as [Last Name Identifier]
 	, case 
 		 when columns_csv like '%MEMB[_]EMAIL[_]ID%' then 'MEMB_EMAIL_ID' 
@@ -204,6 +221,7 @@ SELECT
 		  when columns_csv like '%Email%' then 'Email' 
 		ELSE 'NULL' END as [Email Identifier]
 	, case 
+		 when columns_csv like '%CELL PHONE%' then 'CELL PHONE' 
 		 when columns_csv like '%CELL[_]PHONE%' then 'CELL_PHONE' 
 		 when columns_csv like '%MailPHONE%' then 'MailPHONE' 
 		 when columns_csv like '%MEMB[_]PHONE1%' THEN 'MEMB_PHONE1'
@@ -224,6 +242,9 @@ SELECT
 		 when columns_csv like '%PRIMARY PHONE%' then 'PRIMARY PHONE' 
 		 when columns_csv like '%PRIMARY[_]PHONE%' then 'PRIMARY_PHONE' 
 		 when columns_csv like '%PRIMARY[_]CONTACT_PHONE%' then 'PRIMARY_CONTACT_PHONE' 
+		 when columns_csv like '%MBR_Phone_No%' then 'MBR_Phone_No' 
+		 when columns_csv like '%MBR_Phone%' then 'MBR_Phone' 
+		 when columns_csv like '%HomeTelephoneNumber%' then 'HomeTelephoneNumber' 
 		 when columns_csv like '%Phone%' then 'Phone' 
 		ELSE 'NULL' END as [Main Phone Identifier]
 	, case 
@@ -248,6 +269,7 @@ SELECT
 		 when columns_csv like '%Street ADDRESS%' then 'Street ADDRESS' 
 		 when columns_csv like '%ADDRESS%' then 'ADDRESS' 
 		 when columns_csv like '%SUBADR1%' then 'SUBADR1' --uCali
+		 when columns_csv like '%MBR_ADDR_LINE1%' then 'MBR_ADDR_LINE1' --U COLORADO
 		ELSE 'NULL' END as [Street Address Identifier]
 	, case 
 		 when columns_csv like '%MEMB[_]STREET2%' then 'MEMB_STREET2' 
@@ -277,35 +299,38 @@ SELECT
 		   WHEN columns_csv like '%MEMBER[_]CITY%' then 'MEMBER_CITY'	
 		   WHEN columns_csv like '%MEMBERs[_]CITY%' then 'MEMBERS_CITY' --iHeart Trustmark & United Rentals	
 		   WHEN columns_csv like '%subCITY%' then 'SUBCITY' --uCali
+		   WHEN columns_csv like '%MBR_CITY_NM%' then 'MBR_CITY_NM'
+		   WHEN columns_csv like '%MBR_CITY%' then 'MBR_CITY'
 		   WHEN columns_csv like '%CITY%' then 'CITY'
 			ELSE 'NULL' end as [City Identifier]
 	, case 
            When columns_csv like '%Home address - State%' then 'Home address - State' 
            When columns_csv like '%MailState%' then 'MailState' 
            When columns_csv like '%USPS[_]State[_]Code%' then 'USPS_State_Code' 
-		  when columns_csv like '%MEMB[_]STATE%' then 'MEMB_STATE' 
 		 when columns_csv like '%MEM[_]STATE[_]CD%' then 'MEM_STATE_CD' 
+		 when columns_csv like '%MEMB[_]STATE%' then 'MEMB_STATE' 
 		 when columns_csv like '%MEMBER[_]STATE%' then 'MEMBER_STATE' 
 		 when columns_csv like '%MEMBER STATE%' then 'MEMBER STATE'
 	   WHEN columns_csv like '%MEMBERstate%' then 'MEMBERstate'	
 		 when columns_csv like '%MEMBERS[_]STATE%' then 'MEMBERS_STATE' --iHeart TrustmarkUnited Rentals
 		 when columns_csv like '%STATE[_]OR[_]PROVINCE%' then 'STATE_OR_PROVINCE' 
+		 when columns_csv like '%MBR_STATE%' then 'MBR_STATE' 
 		 when columns_csv like '%STATE%' then 'STATE' 
 		 WHEN columns_csv like '%SUBST%' then 'SUBST' --uCali
-
+		 when columns_csv like '%ST_PRVNC_CD%' then 'ST_PRVNC_CD' --U COLORADO
 		ELSE 'NULL' END as [State Identifier]
 	, case 
            When columns_csv like '%Home address - Zip%' then 'Home address - Zip' 
 		   When columns_csv like '%MailZip%' then 'MailZip' 
-
 		 when columns_csv like '%MEMB[_]Zip[_]Code%' then 'MEMB_Zip_Code' 
 		 when columns_csv like '%MEMB[_]ZipCode%' then 'MEMB_ZipCode' 
 		 when columns_csv like '%MEMBER[_]ZIPCODE%' then 'MEMBER_ZIPCODE' 
 		 when columns_csv like '%MEMBERZIPCODE%' then 'MEMBERZIPCODE' 
 		 when columns_csv like '%MEMBER ZIPCODE%' then 'MEMBER ZIPCODE' 
 		 when columns_csv like '%MEMBER ZIP%' then 'MEMBER ZIP' 
-		 when columns_csv like '%MEMB[_]ZIP%' then 'MEMB_ZIP' 
 		 when columns_csv like '%MEM[_]ZIP[_]CD%' then 'MEM_ZIP_CD' 
+		 when columns_csv like '%MEMB[_]ZIPCode%' then 'MEMB_ZIPCode' 
+		 when columns_csv like '%MEMB[_]ZIP%' then 'MEMB_ZIP' 
 		 --when columns_csv like '%PROVIDER_ZIPCODE%' then 'PROVIDER_ZIPCODE' 
 		 --when columns_csv like '%Work_Location_Zip_Code%' then 'Work_Location_Zip_Code' 
 		 when columns_csv like '%Zip Code%' then 'Zip Code' 
@@ -313,6 +338,8 @@ SELECT
 		 when columns_csv like '%ZipCode%' then 'ZipCode' 
 		 when columns_csv like '%homeZIP%' then 'HOMEZIP' --U Cali 
 		 when columns_csv like '%Members_ZIP%' then 'Members_ZIP' 
+		 when columns_csv like '%MBR_ZIP_CD%' then 'MBR_ZIP_CD' 
+		 when columns_csv like '%MBR_ZIP%' then 'MBR_ZIP' 
 		 when columns_csv like '%ZIP%' then 'ZIP' 
 		 when columns_csv like '%Postal_Code%' then 'Postal_Code' --tbl_fidelity_disn
 		ELSE 'NULL' END as [Zip Identifier]
@@ -333,6 +360,8 @@ SELECT
 		 when columns_csv like '%Member_Birth_Date%' then 'Member_Birth_Date' 
 		 when columns_csv like '%MBRDOB%' then 'MBRDOB' 
 		 when columns_csv like '%DOB%' then 'DOB' 
+		 when columns_csv like '%MBR_BRTH_DT%' then 'MBR_BRTH_DT' --U COLORADO
+
 		ELSE 'NULL' END as [Birthday Identifier]
 	 , case 
 		when columns_csv like '%FERTILITY[_]ELIG[_]EFF[_]START[_]DATE%' then 'FERTILITY_ELIG_EFF_START_DATE' 
@@ -357,6 +386,7 @@ SELECT
 		when columns_csv like '%ACTSTDT%' then 'ACTSTDT' 
 		when columns_csv like '%StructureEffectiveDate%' then 'StructureEffectiveDate' 
 		when columns_csv like '%Individual Original Effective Date at Aetna%' then 'Individual Original Effective Date at Aetna' 
+		when columns_csv like '%MBR_EFCTV_DT%' then 'MBR_EFCTV_DT' --U COLORADO
 		ELSE 'NULL' END as [Start Date Identifier] 	
 	, case 
 		when columns_csv like '%FERTILITY[_]ELIG[_]EFF[_]END[_]DATE%' then 'FERTILITY_ELIG_EFF_END_DATE' 
@@ -381,22 +411,64 @@ SELECT
 		when columns_csv like '%ACTENDDT%' then 'ACTENDDT' 
 		when columns_csv like '%StructureCancelDate%' then 'StructureCancelDate' 
 		when columns_csv like '%Individual Cancel Date at Aetna%' then 'Individual Cancel Date at Aetna' 
+		when columns_csv like '%MBR_TERM_DT%' then 'MBR_TERM_DT' --U COLORADO
 		ELSE 'NULL' END as [End Date Identifier] 	
-
+	, case 
+		when columns_csv like '%TimeofEntry%' then 'TimeofEntry' 
+		when columns_csv like '%CreatedDate%' then 'CreatedDate' 
+		when columns_csv like '%Time_of_Entry%' then 'Time_of_Entry' 
+		when columns_csv like '%Created_Date%' then 'Created_Date'
+		--when columns_csv like '%FilesName%' then 'FilesName' 
+	 ELSE 'NULL' END as [Source File Date Identifier] 
 	, case 
 		when columns_csv like '%File[_]Name%' then 'File_Name' 
 		when columns_csv like '%FileName%' then 'FileName' 
 		when columns_csv like '%FilesName%' then 'FilesName' 
 	 ELSE 'NULL' END as [Source File Name Identifier] 
-
 	, case 
 		when columns_csv like '%EDIT[_]STATUS%' then 'EDIT_STATUS' 
 	 ELSE 'NULL' END as [Void Row Identifier] 
+	, case 
+		when columns_csv like '%Member[_]Gender[_]Code%' then 'Member_Gender_Code'
+		when columns_csv like '%Member[_]Gender%' then 'Member_Gender'
+		when columns_csv like '%Member Gender%' then 'Member Gender'
+		when columns_csv like '%Memb[_]Gender%' then 'Memb_Gender'
+		when columns_csv like '%mbr[_]gender%' then 'mbr_gender'
+		when columns_csv like '%Legal Gender%' then 'Legal Gender'
+		when columns_csv like '%MBR_Gender%' then 'MBR_Gender'
+		when columns_csv like '%dEPENDENT_Gender%' then 'Dependent_Gender'
+		when columns_csv like '%Gender%' then 'Gender'
+		when columns_csv like '%Members[_]Sex%' then 'Members_Sex'
+		when columns_csv like '%MBRSEX%' then 'MBRSEX'
+		when columns_csv like '%sex%' then 'Sex'
+		ELSE 'NULL' END as [Gender Identifier] 
+	, case 
+		when columns_csv like '%Active Indicator%' then 'Active Indicator'
+		when columns_csv like '%Active[_]Indicator%' then 'Active_Indicator'
+		when columns_csv like '%MEMB[_]ACTIVE[_]IND%' then 'MEMB_ACTIVE_IND'
+		when columns_csv like '%Active[_]Ind%' then 'Active_Ind'
+		when columns_csv like '%BenefitStatusCode%' then 'BenefitStatusCode'
+		when columns_csv like '%Benefit[_]Status[_]Code%' then 'Benefit_Status_Code'
+		when columns_csv like '%Employee Status%' then 'Employee Status'
+		when columns_csv like '%Employee[_]Status%' then 'Employee_Status'
+		when columns_csv like '%Employment Status%' then 'Employment Status'
+		when columns_csv like '%mbr_current_status%' then 'mbr_current_status'
+	--	when columns_csv like '%Active%' then 'Active'
+	 ELSE 'NULL' END as [Active Indicator Identifier] 
 into #Table_with_ID_Info
 from #schema_summary s;
 
-  
+  select * from #schema_summary
+  select * from #Table_with_ID_Info;
 
+  select s.*
+  from #schema_summary s
+  join #Table_with_ID_Info t
+	 on s.table_name = t.table_name
+  where --t.[Gender Identifier] = 'NULL'
+  --or 
+  t.[Active Indicator Identifier] = 'NULL'
+  order by Columns_CSV
 /*
 	U CALI HAS THE SUBSCRIBER AND DEPENDENT NAMES IN SEPARATE COLUMNS
 	
@@ -441,9 +513,29 @@ select
 	, t.[Start Date Identifier]
 	, t.[End Date Identifier]
 	, t.[Void Row Identifier]
+	, t.[Source File Date Identifier]
 	, t.[Source File Name Identifier]
+	, t.[Gender Identifier]
+	, t.[Active Indicator Identifier]
 into [WorkBench].[dbo].[Eligibility_Table_Identifiers_RAW]
 from #Table_with_ID_Info t
 left join  [WorkBench].[dbo].[Eligibility_Table_Names_by_Client_RAW_Premier] e
 	on  t.table_name = ('['+e.Table_Name+']')
 ; 
+
+ select '' '#schema_summary';
+select top 100 * from #schema_summary
+
+select '' '[WorkBench].[dbo].[Eligibility_Table_Identifiers_RAW]';
+select * 
+FROM [WorkBench].[dbo].[Eligibility_Table_Identifiers_RAW]
+
+--select s.* 
+--FROM [WorkBench].[dbo].[Eligibility_Table_Identifiers_RAW] ei
+--JOIN #schema_summary s
+--	on ei.table_name = QUOTENAME(s.table_name)
+--where [Source File Date Identifier] <> 'NULL'
+
+--select * 
+--FROM [WorkBench].[dbo].[Eligibility_Table_Identifiers_RAW]
+--where [Source File Date Identifier] = 'NULL'
