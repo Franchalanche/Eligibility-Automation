@@ -123,6 +123,7 @@ SELECT
 		 --when columns_csv like '%group_reporting_MEMBER_ID%' then 'group_reporting_MEMBER_ID' --WRONG!! BRADLEY NEEDS SUBSCRIBER_ID
 		 when columns_csv like '%MEMBER[_]ID%' 
 				AND TABLE_NAME NOT LIKE '%ARKEMA%'
+				AND TABLE_NAME NOT LIKE '%BORGWARNER%'
 				AND TABLE_NAME NOT LIKE '%CRICUT%'
 				AND TABLE_NAME NOT LIKE '%LURIE%'
 				AND TABLE_NAME NOT LIKE '%PLUG%'
