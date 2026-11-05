@@ -39,7 +39,8 @@ WHERE  --[Void Row Identifier]='null'
 SELECT @sql;
 
 SET @SQL = CONVERT(VARCHAR(MAX), --"DROP TABLE IF EXISTS  WorkBench.dbo.xxEligibility_All_RAW; 
-		"insert INTO Workbench.dbo.xxEligibility_All_RAW     (
+		"TRUNCATE TABLE Workbench.dbo.xxEligibility_All_RAW;
+		insert INTO Workbench.dbo.xxEligibility_All_RAW     (
         Contract,
         Member_ID,
         Relationship_ID,
