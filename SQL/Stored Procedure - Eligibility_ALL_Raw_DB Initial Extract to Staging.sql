@@ -107,8 +107,12 @@ SELECT i.[Contract]
 , cast(0 as int) as [Chosen_Date_Year_Month]
 --, cast(0 as int) as [Chosen_Date_Year]
 , cast(0 as int) as Month_Order
---, cast(0 as nvarchar(20)) as Order_Desc
+, cast(0 as nvarchar(20)) as Order_Desc
 , cast(0 as varchar(500)) as Table_Type
+, i.[Misc Field #1 Identifier]
+, i.[Misc Field #1 Value]
+, i.[Misc Field #2 Identifier]
+, i.[Misc Field #2 Value]	
 INTO #temp_staging
 FROM WorkBench.dbo.xxEligibility_All_RAW--Eligibility_ALL_Raw_DB_Extraction 
 i
