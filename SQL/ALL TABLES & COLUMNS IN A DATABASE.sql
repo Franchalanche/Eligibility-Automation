@@ -456,6 +456,14 @@ SELECT
 		when columns_csv like '%mbr_current_status%' then 'mbr_current_status'
 	--	when columns_csv like '%Active%' then 'Active'
 	 ELSE 'NULL' END as [Active Indicator Identifier] 
+	, case 
+		when table_name like 'Hertz%' then 'Group Location Code'
+		when table_name like 'Highmark%' then 'Group Name'
+		when table_name like 'LCL%' then 'SubGroupName'
+	 ELSE 'NULL' END as [Misc Field #1 Identifier] 
+	, case 
+		when table_name like 'LCL%' then 'SubGroupID'
+	 ELSE 'NULL' END as [Misc Field #2 Identifier] 	
 into #Table_with_ID_Info
 from #schema_summary s;
 
@@ -518,10 +526,13 @@ select
 	, t.[Source File Name Identifier]
 	, t.[Gender Identifier]
 	, t.[Active Indicator Identifier]
+	, t.[Misc Field #1 Identifier]
+	, t.[Misc Field #2 Identifier]	
 into [WorkBench].[dbo].[Eligibility_Table_Identifiers_RAW]
 from #Table_with_ID_Info t
 left join  [WorkBench].[dbo].[Eligibility_Table_Names_by_Client_RAW_Premier] e
 	on  t.table_name = ('['+e.Table_Name+']')
+where e.Contract IS NOT NULL	
 ; 
 
  select '' '#schema_summary';
