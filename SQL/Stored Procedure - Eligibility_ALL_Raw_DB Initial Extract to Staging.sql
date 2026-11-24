@@ -611,13 +611,18 @@ INSERT INTO WorkBench.dbo.Eligibility_ALL_RAW
 		, [File_Name], Source_Table, File_Size, IS_CreatedDate , File_Name_Date
 		, File_Name_Date_Cleaned, Raw_File_TimeStamp, Chosen_Date
 		, Chosen_Date_Year_Month--, Chosen_Date_Year--, Month_Order
+		, [Misc Field #1 Identifier]	, [Misc Field #1 Value]
+		, [Misc Field #2 Identifier]	, [Misc Field #2 Value]
+		, Date_Added
 		)
 SELECT [Contract], Member_ID, Relationship_ID, New_Relationship, First_Name, Last_Name, Email	, Main_Phone, Street_Address
 		, Address_2, City, [State], Zip, Date_of_Birth, Coverage_Start_Date, Coverage_End_Date, Gender, Active_Indicator
 		, [File_Name], Source_Table, File_Size, IS_CreatedDate , File_Name_Date
 		, File_Name_Date_Cleaned, Raw_File_TimeStamp, Chosen_Date
 		, Chosen_Date_Year_Month--, Chosen_Date_Year--, Month_Order
-		
+		, [Misc Field #1 Identifier]	, [Misc Field #1 Value]
+		, [Misc Field #2 Identifier]	, [Misc Field #2 Value]	
+		, cast(getdate() as datetime) 		
 FROM #temp_staging
 ;
 SELECT 'INSERT INTO - ENDED' 'Eligibility_ALL_RAW';
