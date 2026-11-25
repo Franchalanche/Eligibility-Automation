@@ -19,10 +19,8 @@ Contract = '" + [Contract] + "', "
 + "Coverage_End_Date =  TRY_CONVERT(date, " + CASE WHEN [End Date Identifier] <> 'NULL' THEN   QUOTENAME([End Date Identifier])  ELSE 'NULL' END + "), " 
 + "File_Name =  CONVERT(varchar(500), " + CASE WHEN [source file name identifier] <> 'NULL' THEN   QUOTENAME([source file name identifier])  ELSE 'NULL' END + "), " 
 + "Source_Table =  CONVERT(varchar(500), " + CASE WHEN [Full_Table_Name] <> 'NULL' THEN CONCAT('''', [Full_Table_Name], '''')  ELSE 'NULL' END + "), " 
-+ "[Misc Field #1 Identifier] = [Misc Field #1 Identifier]), "
-+ "[Misc Field #1 Value] = CONVERT(varchar(500), " +  CASE WHEN [Misc Field #1 Identifier] <> 'NULL' THEN QUOTENAME([Misc Field #1 Value]) ELSE 'NULL' END + '), '
-+ "[Misc Field #2 Identifier] = [Misc Field #2 Identifier], "
-+ "[Misc Field #2 Value] = CONVERT(varchar(500), " +  CASE WHEN [Misc Field #2 Identifier] <> 'NULL' THEN QUOTENAME([Misc Field #2 Value]) ELSE 'NULL' END + ') '
++ "[Misc Field #1 Identifier] = CONVERT(varchar(500), " + CASE WHEN [Misc Field #1 Identifier] <> 'NULL' THEN QUOTENAME([Misc Field #1 Identifier])  ELSE 'NULL' END + "), "
++ "[Misc Field #2 Identifier] = CONVERT(varchar(500), " + CASE WHEN [Misc Field #2 Identifier] <> 'NULL' THEN QUOTENAME([Misc Field #2 Identifier])  ELSE 'NULL' END + ") "
 + " FROM " + [Full_Table_Name]), ' UNION ALL ')  
  FROM WorkBench.dbo.Eligibility_Table_Identifiers_RAW 
 WHERE  --[Void Row Identifier]='null'
@@ -63,9 +61,7 @@ SET @SQL = CONVERT(VARCHAR(MAX), --"DROP TABLE IF EXISTS  WorkBench.dbo.xxEligib
 		File_Name,
         Source_Table,
 		[Misc Field #1 Identifier],
-		[Misc Field #1 Value],
-		[Misc Field #2 Identifier],
-		[Misc Field #2 Value]
+		[Misc Field #2 Identifier]
     ) "+ @SQL + " ")
 SELECT @SQL
 EXEC (@SQL)
