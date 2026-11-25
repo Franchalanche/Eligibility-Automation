@@ -355,6 +355,11 @@ where contract like '%kantar%'
 select count(*) from #combo_staging
 ;
 
+select top 2000 * from #combo_staging
+where contract like '%duane%'
+select top 2000 * from #working_table
+;
+
 drop table if exists #id_popularity
 
 select distinct cs.contract, cs.Relationship_ID, count(*) as [Count]
@@ -400,6 +405,7 @@ select '' '#id_popularity';
 select * from #id_popularity
 order by contract, Relationship_ID
 ;
+
 select '#id_popularity' 'contracts with more than 1 Employee ID or who need an addresss id or other special rules' ;
 select distinct contract
 FROM #id_popularity
@@ -530,15 +536,7 @@ FROM combo_summary cs
 JOIN emp_IDs id
     ON cs.Contract = id.Contract;
 
-select '' '#combos_summary';
-select * from #combos_summary
-order by contract, Rel_ID_Grouping;
 
-
-select '' '#id_popularity';
-select * from #id_popularity
-order by contract, Relationship_ID
-;
 
 select '' '#EMPid_in_group_analysis';
 select * from #EMPid_in_group_analysis
@@ -551,6 +549,7 @@ from #id_popularity id
 JOIN workbench.dbo.eligibility_table_identifiers_raw eti
 	on id.Contract = eti.Contract
 order by id.contract, id.Relationship_ID
+
 ;
 
 SELECT 'WHERE [IS Emp ID in All?] <> Good' '#EMPid_in_group_analysis';
@@ -558,6 +557,17 @@ select *--distinct Contract as EMP_ID_NOT_IN_ALL_RELATIONSHIP_GROUPS
 FROM #EMPid_in_group_analysis 
 where [IS Emp ID in All?] <> 'Good'
 order by Contract;
+
+
+select '' '#id_popularity';
+select * from #id_popularity
+order by contract, Relationship_ID
+;
+
+select '' '#combos_summary';
+select * from #combos_summary
+order by contract, Rel_ID_Grouping;
+
 
 select 'WHERE [IS Emp ID in All?] <> Good' '* from from #combos c';
 select c.*
@@ -569,10 +579,184 @@ JOIN #EMPid_in_group_analysis emp_id
 where [IS Emp ID in All?] <> 'Good'
 AND C.cONTRACT NOT LIKE '%IHEART%'
 order by Contract;
+;
+
+select '' '#working_table';
+select Contract
+	, unique_IDs
+	, unique_Subs_n_deps
+	, [desc]
+	, family_Description
+	, FUll_Table_Name
+from #working_table
+order by contract;
 
 select '' '#working_table';
 select * from #working_table
 order by contract;
+
+
+select 'top 1000 (looking into erroneous group details)' '#combos';
+select top 10000 
+* from #combos
+where contract like '%Cricut%'
+	and rel_id_grouping in ('2')
+;
+
+
+SELECT 'ALL' '#EMPid_in_group_analysis';
+select Rel_ID_Grouping
+	, Contract
+	, concat(cast((Percentage_of_Total*100.0) as decimal(10,1)),'%') as Percentage_of_Total
+	, [Is Emp ID In All?]
+--*--distinct Contract as EMP_ID_NOT_IN_ALL_RELATIONSHIP_GROUPS
+FROM #EMPid_in_group_analysis 
+--where [IS Emp ID in All?] <> 'Good'
+order by Contract;
+
+drop table if exists #groups_without_employee;
+select Contract
+	, count(*) as [Count]
+	, sum(Percentage_of_Total) as Combined_Percent
+into #groups_without_employee
+FROM #EMPid_in_group_analysis 
+where [IS Emp ID in All?] <> 'Good'
+group by contract
+order by Contract;
+
+select '' '#groups_without_employee';
+select * from #groups_without_employee;
+
+select '' '#groups_without_employee';
+select * from #groups_without_employee
+where [Count] = 1;
+
+select '' '#groups_without_employee';
+select * from #groups_without_employee
+where [Count] > 1;
+
+
+/*NARROWING DOWN PROBLEM GROUPS*/
+
+
+select 'Count = 1 Percent < 2%' '#groups_without_employee';
+select * from #groups_without_employee
+where [Count] = 1
+and Combined_Percent < .02
+order by Contract;
+
+select 'Count = 1 Percent > 2%' '#groups_without_employee';
+select * from #groups_without_employee
+where [Count] = 1
+and Combined_Percent >= .02
+order by Contract;
+
+select 'Count > 1' '#groups_without_employee';
+select * from #groups_without_employee
+where [Count] > 1
+order by Contract;
+
+select 'Count > 1 and Percent>2' '#groups_without_employee';
+--3 of the 4 one-offs are showing up here - how to separate them out (Sage, REproductie Freedom for All, Kantar) (no duane morris)
+select * from #groups_without_employee
+where [Count] > 1
+and Combined_Percent >= .02
+order by Contract;
+
+select 'Count > 1 Percent < 2%' '#groups_without_employee';
+--Highmark shows up here, though i think it's group-based
+select * from #groups_without_employee
+where [Count] > 1
+and Combined_Percent < .02
+order by Contract;
+
+
+select 'Relationship_ID is blank or NULL' '#id_popularity';
+--CONTAINS WAY MORE THAN EXPECTED (only Bradley, Borgwarner, Jupiter)
+select distinct contract 
+from #id_popularity
+where Relationship_ID = '' 
+or Relationship_ID IS NULL
+;
+
+select 'grouping is blank or null ' '#EmpID_in_Group_Analysis'
+select * from
+#EmpID_in_Group_Analysis
+where [Is Emp ID In All?] <> 'Good'
+and (trim(Rel_ID_Grouping) = '' or Rel_ID_Grouping IS NULL or rel_id_Grouping = 'NULL')
+;;
+
+select '' '#groups_without_employee';
+select * from #groups_without_employee
+order by Contract;
+
+
+
+select '' '#working_table';
+select * from #working_table
+order by contract;
+
+
+/*NEED TO WORK ON FILLING THIS OUT*/
+select 'Has Children Only' '#working_table';
+select * from #working_table
+where Family_Description = 'Has Children'
+order by contract;
+
+
+
+SELECT 'ALL' '#EMPid_in_group_analysis';
+--BORNWARNER IS SUSPICIOUS HERE
+--EPIC might have Spouse = 2 and child = 1 - double check (based on (0,1) vs (0,2) counts)
+select Rel_ID_Grouping
+	, Contract
+	, concat(cast((Percentage_of_Total*100.0) as decimal(10,1)),'%') as Percentage_of_Total
+	, [Is Emp ID In All?]
+--*--distinct Contract as EMP_ID_NOT_IN_ALL_RELATIONSHIP_GROUPS
+FROM #EMPid_in_group_analysis 
+--where [IS Emp ID in All?] <> 'Good'
+order by Contract;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT 'WHERE [IS Emp ID in All?] <> Good' '#EMPid_in_group_analysis';
+select --*--
+distinct Contract as EMP_ID_NOT_IN_ALL_RELATIONSHIP_GROUPS_BUT_ALSO_OVER_1_PERCENT
+FROM #EMPid_in_group_analysis 
+where [IS Emp ID in All?] <> 'Good'
+and percentage_of_total > .01
+group by contract
+order by Contract;
+
+with rows_in_emp_ID as
+(
+	select contract, count(*) as Row_Count
+	from #EMPid_in_group_analysis
+	where [IS Emp ID in All?] <> 'Good'
+	group by contract
+)
+select 
+distinct e.Contract as EMP_ID_NOT_IN_ALL_RELATIONSHIP_GROUPS_BUT_ALSO_OVER_1_PERCENT
+FROM #EMPid_in_group_analysis e
+JOIN rows_in_emp_ID r
+	on e.Contract = r.Contract
+where [IS Emp ID in All?] <> 'Good'
+	and percentage_of_total > .01
+	and r.Row_Count = 1
+group by e.contract
+order by e.Contract;
+
 
 select distinct contract from #working_table order by contract;
 
